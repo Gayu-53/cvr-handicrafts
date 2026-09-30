@@ -1,0 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream text-espresso-900 font-body antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+
+  ::selection {
+    @apply bg-gold-300/50 text-espresso-900;
+  }
+}
+
+@layer components {
+  .container-cvr {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-gold-gradient
+      px-6 py-3 font-semibold text-espresso-900 shadow-gold transition-all duration-300
+      hover:brightness-105 hover:shadow-lg active:scale-[0.98] disabled:opacity-50
+      disabled:pointer-events-none;
+  }
+
+  .btn-outline-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-gold-400
+      px-6 py-3 font-semibold text-gold-600 transition-all duration-300
+      hover:bg-gold-400 hover:text-espresso-900 active:scale-[0.98];
+  }
+
+  .btn-espresso {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-espresso-900
+      px-6 py-3 font-semibold text-cream shadow-card transition-all duration-300
+      hover:bg-espresso-800 active:scale-[0.98] disabled:opacity-50
+      disabled:pointer-events-none;
+  }
+
+  .card-cvr {
+    @apply rounded-2xl border border-gold-200/40 bg-white shadow-card
+      transition-shadow duration-300 hover:shadow-lg;
+  }
+
+  .section-heading {
+    @apply font-display text-3xl font-bold text-espresso-900 sm:text-4xl;
+  }
+
+  .section-eyebrow {
+    @apply mb-2 inline-block text-sm font-semibold uppercase
+      tracking-[0.2em] text-gold-600;
+  }
+
+  .divider-ornament {
+    @apply mx-auto my-4 h-px w-24 bg-gradient-to-r
+      from-transparent via-gold-400 to-transparent;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-espresso-100/60 before:absolute before:inset-0
+      before:-translate-x-full before:animate-shimmer
+      before:bg-gradient-to-r before:from-transparent
+      before:via-white/40 before:to-transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

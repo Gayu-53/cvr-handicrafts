@@ -1,0 +1,292 @@
+// CVR Handicrafts — Database Schema
+// Designed for unlimited future categories/subcategories/products/specifications.
+// Nothing here assumes only "Statues / Buddha / Tanjore" — those are just initial seed rows.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------- ADMIN AUTH ----------
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ADMIN") // ADMIN | SUPERADMIN
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------- CATALOGUE ----------
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  imageStorageKey String? // NEW: storage path for the category image, used to delete/replace cleanly
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  metaTitle       String?
+  metaDescription String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  subcategories Subcategory[]
+  products      Product[]           // legacy single-category relation, kept for backward compatibility
+  productLinks  ProductCategory[]   // new many-to-many relation
+
+  // Optional specification template suggestions for this category (editable, not enforced)
+  specTemplates CategorySpecTemplate[]
+
+  @@index([slug])
+  @@index([isActive, sortOrder])
+}
+
+model CategorySpecTemplate {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  label      String
+  sortOrder  Int      @default(0)
+
+  @@index([categoryId])
+}
+
+model Subcategory {
+  id          String    @id @default(cuid())
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, isActive, sortOrder])
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  code             String?  // business SKU/code shown to customer, e.g. "DV104"
+
+  // LEGACY single-category fields — kept so nothing existing breaks.
+  // The primary category (first selected in admin) is mirrored here automatically.
+  categoryId       String
+  category         Category @relation(fields: [categoryId], references: [id])
+
+  // Subcategory is now a free-text label instead of a foreign key (client request:
+  // no "None"/"All" dropdown, just an optional text field). subcategoryId is kept
+  // temporarily so old data isn't lost, but the app no longer requires it.
+  subcategoryId    String?
+  subcategory      Subcategory? @relation(fields: [subcategoryId], references: [id])
+  subcategoryLabel String?  // NEW: free-text subcategory, e.g. "Wall Decor", "Krishna"
+
+  categories       ProductCategory[] // NEW: many-to-many categories
+
+  description      String?
+  shortDescription String?
+
+  price            Decimal  @db.Decimal(10, 2)
+  salePrice        Decimal? @db.Decimal(10, 2)
+
+  stockQuantity    Int      @default(0)
+  inStock          Boolean  @default(true)
+
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  isNewArrival     Boolean  @default(false)
+
+  metaTitle        String?
+  metaDescription  String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  images           ProductImage[]
+  specifications   ProductSpecification[]
+  orderItems       OrderItem[]
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([isActive, isFeatured])
+  @@index([isActive, isNewArrival])
+  @@index([slug])
+}
+
+// Join table enabling one product to belong to many categories, and one
+// category to contain many products. Additive to the schema — the legacy
+// Product.categoryId/category fields above are left in place and kept in
+// sync (mirroring the first-selected category) so no existing code/queries
+// that relied on a single category break.
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@index([productId])
+}
+
+// Multiple images per product, ordered, with one marked primary.
+// url is ALWAYS a persistent Supabase Storage public URL — never a local path.
+model ProductImage {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url        String
+  storageKey String   // path inside the storage bucket, used for deletion
+  altText    String?
+  isPrimary  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([productId, sortOrder])
+}
+
+// Fully dynamic key/value specs — this is what allows one product to have
+// Material/Height/Weight and another Material/Height/Diameter/Finish, etc.
+model ProductSpecification {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String   // e.g. "Material", "Height", "Weight", "Diameter"
+  value     String   // e.g. "Brass", "3.5 inch", "220 gm"
+  sortOrder Int      @default(0)
+
+  @@index([productId, sortOrder])
+}
+
+// ---------- HOMEPAGE / SITE CONTENT (admin-editable, no code changes needed) ----------
+
+model SiteSetting {
+  id    String @id @default(cuid())
+  key   String @unique // e.g. "whatsapp_number", "contact_email", "instagram_handle"
+  value String
+}
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String?
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// ---------- CUSTOMERS / ORDERS / PAYMENTS ----------
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String @unique
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@index([phone])
+}
+
+enum OrderStatus {
+  PENDING
+  PAYMENT_PENDING
+  PAID
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique // human-friendly, e.g. CVR-000123
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+
+  addressLine   String
+  city          String
+  state         String
+  pincode       String
+
+  subtotal      Decimal     @db.Decimal(10, 2)
+  shippingFee   Decimal     @db.Decimal(10, 2) @default(0)
+  discount      Decimal     @db.Decimal(10, 2) @default(0)
+  total         Decimal     @db.Decimal(10, 2)
+
+  status        OrderStatus @default(PENDING)
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items         OrderItem[]
+  payment       Payment?
+
+  @@index([status])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  productName String  // snapshot at time of order, survives later product edits
+  productCode String?
+  unitPrice   Decimal @db.Decimal(10, 2)
+  quantity    Int
+  lineTotal   Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  order             Order         @relation(fields: [orderId], references: [id])
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  amount            Decimal       @db.Decimal(10, 2)
+  status            PaymentStatus @default(CREATED)
+  rawWebhookPayload Json?
+  notificationSent  Boolean       @default(false) // NEW: prevents duplicate order-confirmation emails
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status])
+}
