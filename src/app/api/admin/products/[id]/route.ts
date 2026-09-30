@@ -22,7 +22,7 @@ export const PATCH = withErrorHandling(async (req: Request, { params }: { params
   const parsed = productSchema.partial().parse(body);
   const { specifications, categoryIds, ...productData } = parsed;
 
-  const product = await prisma.$transaction(async (tx: typeof prisma) => {
+  const product = await prisma.$transaction(async (tx) => {
     // Keep legacy Product.categoryId in sync with the first selected category
     // whenever categoryIds is part of this update, so any code still reading
     // the old single-category field keeps working.
